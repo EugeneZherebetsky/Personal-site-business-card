@@ -1,9 +1,25 @@
 import type { JobDraft } from '../types'
 
-export const GOOGLE_SCOPES = [
+/**
+ * Headers and labels only. This scope cannot return message bodies; it is
+ * enough to see that a thread was answered and by whom, and to find a message
+ * whose send response was lost.
+ */
+export const GMAIL_METADATA_SCOPE = 'https://www.googleapis.com/auth/gmail.metadata'
+
+/** Scopes a connection cannot work without. */
+export const REQUIRED_GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/gmail.send',
 ] as const
+
+/**
+ * Everything requested when connecting. Reply checking is optional: declining
+ * it in Google's consent screen must not also break Calendar and sending, so
+ * only `REQUIRED_GOOGLE_SCOPES` are enforced and a refused read is reported
+ * where it happens.
+ */
+export const GOOGLE_SCOPES = [...REQUIRED_GOOGLE_SCOPES, GMAIL_METADATA_SCOPE] as const
 
 const GOOGLE_CLIENT_ID_PATTERN = /^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/
 
@@ -84,7 +100,7 @@ export function requestGoogleAccess(userId: string, clientId: string) {
           reject(new Error(response.error_description || response.error || 'Google authorization was cancelled.'))
           return
         }
-        if (oauth2.hasGrantedAllScopes && !oauth2.hasGrantedAllScopes(response, ...GOOGLE_SCOPES)) {
+        if (oauth2.hasGrantedAllScopes && !oauth2.hasGrantedAllScopes(response, ...REQUIRED_GOOGLE_SCOPES)) {
           reject(new Error('Calendar and Gmail permissions are both required for this connection.'))
           return
         }
@@ -257,4 +273,73 @@ export async function sendGmailMessage(accessToken: string, raw: string) {
   })
   if (!response.ok) throw await googleApiError(response, 'Gmail')
   return await response.json() as { id: string; threadId?: string }
+}
+
+export type GmailHeader = { name?: string; value?: string }
+
+export type GmailMessageMetadata = {
+  id: string
+  threadId?: string
+  internalDate?: string
+  labelIds?: string[]
+  payload?: { headers?: GmailHeader[] }
+}
+
+/**
+ * Headers read when classifying a message on a thread. The automation headers
+ * tell an out-of-office or a bounce apart from a person answering.
+ */
+export const THREAD_METADATA_HEADERS = [
+  'From',
+  'To',
+  'Subject',
+  'Date',
+  'Auto-Submitted',
+  'X-Autoreply',
+  'X-Autorespond',
+  'Precedence',
+  'X-Failed-Recipients',
+  'Content-Type',
+] as const
+
+function metadataUrl(path: string, headers: readonly string[]) {
+  const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`)
+  url.searchParams.set('format', 'metadata')
+  for (const header of headers) url.searchParams.append('metadataHeaders', header)
+  return url
+}
+
+/**
+ * Every message on one thread, headers and labels only. Returns null when the
+ * thread no longer exists in the mailbox.
+ */
+export async function fetchGmailThread(accessToken: string, threadId: string) {
+  const url = metadataUrl(`threads/${encodeURIComponent(threadId)}`, THREAD_METADATA_HEADERS)
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (response.status === 404) return null
+  if (!response.ok) throw await googleApiError(response, 'Gmail')
+  return await response.json() as { id: string; messages?: GmailMessageMetadata[] }
+}
+
+/**
+ * Recent messages in the Sent label, newest first, used to find a message
+ * whose send response was lost. The label filter is used rather than a search
+ * query because the metadata scope does not permit queries.
+ */
+export async function fetchRecentSentMessages(accessToken: string, maxResults = 25) {
+  const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
+  listUrl.searchParams.set('labelIds', 'SENT')
+  listUrl.searchParams.set('maxResults', String(maxResults))
+  const response = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!response.ok) throw await googleApiError(response, 'Gmail')
+  const listing = await response.json() as { messages?: Array<{ id: string }> }
+
+  return Promise.all((listing.messages ?? []).map(async ({ id }) => {
+    const messageResponse = await fetch(
+      metadataUrl(`messages/${encodeURIComponent(id)}`, ['To', 'Subject', 'Date']),
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+    if (!messageResponse.ok) throw await googleApiError(messageResponse, 'Gmail')
+    return await messageResponse.json() as GmailMessageMetadata
+  }))
 }

@@ -73,6 +73,21 @@ export function updateOutreachOutcome(email: OutreachEmail, payload: object) {
   return supabase.from(TABLE).update(payload).eq('id', email.id).eq('version', email.version).select('id').maybeSingle()
 }
 
+/**
+ * Marks a sent message replied after a person answered on its Gmail thread.
+ * Returns the whole row so an open editor can replace its copy and keep its
+ * version current.
+ */
+export function markOutreachReplied(email: OutreachEmail, repliedAt: string) {
+  return supabase
+    .from(TABLE)
+    .update({ reply_status: 'replied', replied_at: repliedAt })
+    .eq('id', email.id)
+    .eq('version', email.version)
+    .select('*')
+    .maybeSingle()
+}
+
 export function deleteOutreachRow(email: OutreachEmail) {
   return supabase.from(TABLE).delete().eq('id', email.id).eq('version', email.version).select('id').maybeSingle()
 }

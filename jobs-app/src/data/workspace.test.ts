@@ -82,6 +82,7 @@ describe('subscribeToWorkspace', () => {
       ['cv_blocks', 'UPDATE', 'change'],
       ['outreach_emails', 'INSERT', 'change'],
       ['outreach_emails', 'UPDATE', 'change'],
+      ['email_replies', 'INSERT', 'change'],
     ].map(([table, event, handler]) => ({ table, event, handler }))
 
     const byKey = (

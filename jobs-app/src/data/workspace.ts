@@ -4,6 +4,7 @@ import { listApplicationSends } from './applicationSends'
 import { listContacts } from './contacts'
 import { listCVBlocks } from './cvBlocks'
 import { listCVs } from './cvs'
+import { listEmailReplies } from './emailReplies'
 import { listInterviewPreps } from './interviewPreps'
 import { listJobs } from './jobs'
 import { listOutreachEmails } from './outreachEmails'
@@ -13,7 +14,7 @@ import { listStarStories } from './starStories'
 
 /** One round trip for everything the workspace shows. */
 export async function fetchWorkspace(userId: string) {
-  const [jobs, cvs, settings, sends, contacts, stories, preps, stageEvents, blocks, outreach] = await Promise.all([
+  const [jobs, cvs, settings, sends, contacts, stories, preps, stageEvents, blocks, outreach, replies] = await Promise.all([
     listJobs(),
     listCVs(),
     readSettings(userId),
@@ -24,8 +25,9 @@ export async function fetchWorkspace(userId: string) {
     listAllStageEvents(),
     listCVBlocks(),
     listOutreachEmails(),
+    listEmailReplies(),
   ])
-  return { jobs, cvs, settings, sends, contacts, stories, preps, stageEvents, blocks, outreach }
+  return { jobs, cvs, settings, sends, contacts, stories, preps, stageEvents, blocks, outreach, replies }
 }
 
 type WorkspaceListeners = {
@@ -57,6 +59,9 @@ export const WATCHED_TABLES: ReadonlyArray<readonly [table: string, events: read
   ['job_stage_events', ['INSERT']],
   ['cv_blocks', ['INSERT', 'UPDATE']],
   ['outreach_emails', ['INSERT', 'UPDATE']],
+  // Replies are only ever inserted. They are deleted with their job or
+  // outreach message, whose own deletion already reloads the workspace.
+  ['email_replies', ['INSERT']],
 ]
 
 /** Contact interactions also refresh the open contact's history. */

@@ -72,14 +72,16 @@ Every view is reachable on mobile through the horizontal navigation strip.
 
 - Calendar events created from an application's follow-up details.
 - Gmail sending with the linked private CV attached and immutable send history.
+- Check Gmail for replies, one application or outreach message at a time. Out-of-office answers and delivery failures are labelled as such and never count as a reply; a bounce is flagged so a wrong address gets noticed. The application stage is never changed for you.
+- Reply checking reads headers and labels only (the `gmail.metadata` scope). Message bodies are never requested or stored; a detected message records who wrote, when, the subject, and its kind.
 - Google access tokens stay in browser memory and never reach the database.
 
 ### Speculative outreach
 
 - Write directly to a leader at a company you want to work for, whether or not anything is advertised.
-- Send through the Gmail connection you already use for applications, with a CV attached. If a send is interrupted, the message is held with an unknown outcome and asks you to check your Sent folder rather than risking a duplicate.
+- Send through the Gmail connection you already use for applications, with a CV attached. If a send is interrupted, the message is held with an unknown outcome, and Opportunity Desk can look through your recent Sent mail to settle it (you confirm the match) rather than risking a duplicate.
 - The exact subject and message you sent are stored and locked, so a follow-up months later starts from what you actually wrote rather than from memory.
-- Record whether they replied, keep private notes, and schedule the follow-up, which then appears in Reminders and in the daily digest.
+- Record whether they replied, or let a Gmail check mark it when a person answers, keep private notes, and schedule the follow-up, which then appears in Reminders and in the daily digest.
 - Filter by awaiting reply, replied, or no reply, and see how many companies you have approached.
 
 ### Networking
@@ -131,7 +133,10 @@ Calendar and Gmail use Google Identity Services' browser token model. The site s
 3. Configure the OAuth consent screen. Add your own Google address as a test user while the app remains in testing.
 4. Create an OAuth client ID for a Web application.
 5. Add `https://jobs.ezherebetskii.com` and any preview or local origins you use as authorized JavaScript origins.
-6. Paste the client ID into Settings, save it, and select Connect Google.
+6. Add three scopes to the consent screen: `calendar.events`, `gmail.send`, and `gmail.metadata`.
+7. Paste the client ID into Settings, save it, and select Connect Google.
+
+`gmail.send` and `gmail.metadata` are restricted scopes. While the app stays in testing with your own address as a test user, Google verification is not required. Only Calendar and sending are required. If you decline the header permission, Calendar and sending keep working, and the next reply check or **Connect Google** asks Google for it again.
 
 Google authorization expires periodically by design; Calendar and Gmail actions ask you to reconnect when a fresh token is required.
 

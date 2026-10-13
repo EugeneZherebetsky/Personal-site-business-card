@@ -6,10 +6,12 @@ import {
   REPLY_STATUS_LABELS,
   type CV,
   type Contact,
+  type EmailReply,
   type OutreachDraft,
   type OutreachEmail,
   type ReplyStatus,
 } from '../types'
+import { ReplyList } from './ReplyList'
 
 export type OutreachOutcome = {
   reply_status: ReplyStatus
@@ -26,10 +28,14 @@ type OutreachFormProps = {
   title: string
   busy: boolean
   error: string
+  /** Outcome of a reply check or reconciliation, shown inside the dialog. */
+  notice: string
   cvs: CV[]
   contacts: Contact[]
   googleConfigured: boolean
   syncPending: boolean
+  /** Messages already detected on this message's Gmail thread. */
+  replies: EmailReply[]
   onCancel: () => void
   onSaveDraft: (draft: OutreachDraft) => Promise<void>
   onSend: (draft: OutreachDraft) => Promise<void>
@@ -37,16 +43,28 @@ type OutreachFormProps = {
   onRetrySync: () => Promise<void>
   /** Resolves a message whose Gmail response was lost. */
   onResolveAttempt: (email: OutreachEmail, delivered: boolean) => Promise<void>
+  /** Looks for a message whose Gmail response was lost in recent Sent mail. */
+  onReconcileAttempt: (email: OutreachEmail) => Promise<void>
+  /** Asks Gmail whether this message's thread has been answered. */
+  onCheckReply: (email: OutreachEmail) => Promise<void>
 }
 
 export function OutreachForm({
-  initial, sent, inFlight, title, busy, error, cvs, contacts, googleConfigured, syncPending,
-  onCancel, onSaveDraft, onSend, onUpdateOutcome, onRetrySync, onResolveAttempt,
+  initial, sent, inFlight, title, busy, error, notice, cvs, contacts, googleConfigured, syncPending, replies,
+  onCancel, onSaveDraft, onSend, onUpdateOutcome, onRetrySync, onResolveAttempt, onReconcileAttempt, onCheckReply,
 }: OutreachFormProps) {
   const [draft, setDraft] = useState<OutreachDraft>(initial)
   const [replyStatus, setReplyStatus] = useState<ReplyStatus>(sent?.reply_status ?? 'awaiting')
+  const [shownReplyStatus, setShownReplyStatus] = useState(sent?.reply_status)
   const [validationError, setValidationError] = useState('')
   const readOnly = Boolean(sent) || Boolean(inFlight)
+
+  // A reply check can mark the open message replied. Follow that change, or
+  // saving the outcome afterwards would quietly set it back to awaiting.
+  if (sent?.reply_status !== shownReplyStatus) {
+    setShownReplyStatus(sent?.reply_status)
+    if (sent?.reply_status) setReplyStatus(sent.reply_status)
+  }
 
   function field<K extends keyof OutreachDraft>(key: K, value: OutreachDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
@@ -119,9 +137,10 @@ export function OutreachForm({
             <div className="outreach-unknown-banner full" role="alert">
               <strong>Outcome unknown — do not send again yet</strong>
               <span>
-                Gmail was asked to send this message {inFlight.send_attempted_at ? `at ${formatDateTime(inFlight.send_attempted_at)}` : ''}, but the reply never arrived, so it may or may not have been delivered. Its text is locked until you say which. Opportunity Desk can only send email, not read your mailbox, so please check your Gmail Sent folder for “{inFlight.subject}”.
+                Gmail was asked to send this message {inFlight.send_attempted_at ? `at ${formatDateTime(inFlight.send_attempted_at)}` : ''}, but the reply never arrived, so it may or may not have been delivered. Its text is locked until the outcome is known. Opportunity Desk can look through your recent Sent mail for “{inFlight.subject}”, or you can check yourself and record which happened.
               </span>
               <div className="button-row">
+                <button className="button primary" type="button" disabled={busy || !googleConfigured} onClick={() => void onReconcileAttempt(inFlight)}>Check Gmail for me</button>
                 <button className="button secondary" type="button" disabled={busy} onClick={() => void onResolveAttempt(inFlight, true)}>It is in Sent — record as sent</button>
                 <button className="button secondary" type="button" disabled={busy} onClick={() => void onResolveAttempt(inFlight, false)}>Not in Sent — return to draft</button>
               </div>
@@ -170,6 +189,16 @@ export function OutreachForm({
               </label>
               <label>Follow up on<input type="datetime-local" value={draft.follow_up_at} onChange={(event) => field('follow_up_at', event.target.value)} /><small>Appears in Reminders and in the daily email digest.</small></label>
               <label className="full">Notes<textarea rows={3} value={draft.notes} placeholder="What they said, who they referred you to, when to try again." onChange={(event) => field('notes', event.target.value)} /></label>
+              <section className="replies-panel full" aria-label="Replies on this thread">
+                <div className="replies-panel-head">
+                  <strong>Replies on this thread</strong>
+                  <button className="button secondary" type="button" disabled={busy || !googleConfigured || !sent.provider_thread_id} onClick={() => void onCheckReply(sent)}>Check Gmail for a reply</button>
+                </div>
+                {replies.length > 0
+                  ? <ReplyList replies={replies} />
+                  : <small>{sent.provider_thread_id ? 'Nothing recorded yet. A check reads only the sender, subject and date of each message, never its content.' : 'No Gmail thread was recorded for this message, so replies cannot be checked automatically.'}</small>}
+                <small>Automatic replies and delivery failures are listed but never mark the message as replied.</small>
+              </section>
             </>
           ) : (
             <>
@@ -186,6 +215,7 @@ export function OutreachForm({
           )}
 
           {(validationError || error) && <p className="form-message error-text full" role="alert">{validationError || error}</p>}
+          {notice && !validationError && !error && <p className="form-message full" role="status">{notice}</p>}
 
           <div className="form-actions full">
             <button className="button secondary" type="button" disabled={busy} onClick={onCancel}>Close</button>

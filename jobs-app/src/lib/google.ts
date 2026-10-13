@@ -1,15 +1,33 @@
 import type { JobDraft } from '../types'
 
-export const GOOGLE_SCOPES = [
+/**
+ * Headers and labels only. This scope cannot return message bodies; it is
+ * enough to see that a thread was answered and by whom, and to find a message
+ * whose send response was lost.
+ */
+export const GMAIL_METADATA_SCOPE = 'https://www.googleapis.com/auth/gmail.metadata'
+
+/** Scopes a connection cannot work without. */
+export const REQUIRED_GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/gmail.send',
 ] as const
+
+/**
+ * Everything requested when connecting. Reply checking is optional: declining
+ * it in Google's consent screen must not also break Calendar and sending, so
+ * only `REQUIRED_GOOGLE_SCOPES` are enforced for every token, and an action
+ * that needs more asks for it through `requestGoogleAccess`'s `needs`.
+ */
+export const GOOGLE_SCOPES = [...REQUIRED_GOOGLE_SCOPES, GMAIL_METADATA_SCOPE] as const
 
 const GOOGLE_CLIENT_ID_PATTERN = /^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/
 
 type GoogleTokenResponse = {
   access_token?: string
   expires_in?: number
+  /** Space-separated scopes Google actually granted, which may be fewer than requested. */
+  scope?: string
   error?: string
   error_description?: string
 }
@@ -34,15 +52,63 @@ declare global {
   }
 }
 
-let googleToken: { userId: string; clientId: string; accessToken: string; expiresAt: number } | null = null
+type CachedGoogleToken = {
+  userId: string
+  clientId: string
+  accessToken: string
+  expiresAt: number
+  /** What Google granted, so a token missing an optional scope is not reused for it. */
+  scopes: Set<string>
+}
+
+let googleToken: CachedGoogleToken | null = null
 let googleAccessGeneration = 0
+
+/**
+ * Raised when Google issued a token but without a scope the action needs,
+ * typically because the user unticked it on the consent screen. The token is
+ * still cached for the actions it does cover.
+ */
+export class GoogleScopeError extends Error {
+  readonly missing: string[]
+
+  constructor(missing: string[]) {
+    super(
+      missing.includes(GMAIL_METADATA_SCOPE)
+        ? 'Checking Gmail needs Google’s permission to read message headers (never message content), and it was not granted. Try again and allow it when Google asks.'
+        : 'Google did not grant every permission this action needs. Try again and allow them when Google asks.',
+    )
+    this.name = 'GoogleScopeError'
+    this.missing = missing
+  }
+}
+
+/** Scopes Google granted in a token response. */
+function grantedScopes(response: GoogleTokenResponse, oauth2: GoogleOAuth2) {
+  if (typeof response.scope === 'string' && response.scope.trim()) {
+    return new Set(response.scope.trim().split(/\s+/))
+  }
+  if (oauth2.hasGrantedAllScopes) {
+    return new Set(GOOGLE_SCOPES.filter((scope) => oauth2.hasGrantedAllScopes!(response, scope)))
+  }
+  // Nothing to tell us otherwise; a refused read is then caught by forgetGoogleScope.
+  return new Set<string>(GOOGLE_SCOPES)
+}
 
 export function validGoogleClientId(value: string) {
   return GOOGLE_CLIENT_ID_PATTERN.test(value.trim())
 }
 
-export function hasGoogleAccess(userId: string, clientId: string | null | undefined) {
-  return Boolean(userId && clientId && googleToken?.userId === userId && googleToken.clientId === clientId && googleToken.expiresAt > Date.now() + 60_000)
+/** True when a live token for this user and client covers every scope in `needs`. */
+export function hasGoogleAccess(userId: string, clientId: string | null | undefined, needs: readonly string[] = []) {
+  return Boolean(
+    userId &&
+    clientId &&
+    googleToken?.userId === userId &&
+    googleToken.clientId === clientId &&
+    googleToken.expiresAt > Date.now() + 60_000 &&
+    needs.every((scope) => googleToken!.scopes.has(scope)),
+  )
 }
 
 export function clearGoogleAccess() {
@@ -50,13 +116,32 @@ export function clearGoogleAccess() {
   googleAccessGeneration += 1
 }
 
-export function requestGoogleAccess(userId: string, clientId: string) {
+/**
+ * Marks a scope as not usable on the cached token, after Google refused a
+ * request that needed it. The next action needing that scope asks Google
+ * again instead of reusing a token that cannot do the job.
+ */
+export function forgetGoogleScope(scope: string) {
+  googleToken?.scopes.delete(scope)
+}
+
+type GoogleAccessOptions = {
+  /**
+   * Optional scopes this action needs on top of the required ones. A cached
+   * token lacking any of them is not reused: Google is asked again, and the
+   * request fails with `GoogleScopeError` if they are still not granted.
+   */
+  needs?: readonly string[]
+}
+
+export function requestGoogleAccess(userId: string, clientId: string, options: GoogleAccessOptions = {}) {
   if (!userId) return Promise.reject(new Error('Sign in to Opportunity Desk before connecting Google.'))
   const normalizedClientId = clientId.trim()
   if (!validGoogleClientId(normalizedClientId)) {
     return Promise.reject(new Error('Add a valid Google OAuth client ID in Settings first.'))
   }
-  if (hasGoogleAccess(userId, normalizedClientId)) return Promise.resolve(googleToken!.accessToken)
+  const needs = [...REQUIRED_GOOGLE_SCOPES, ...(options.needs ?? [])]
+  if (hasGoogleAccess(userId, normalizedClientId, needs)) return Promise.resolve(googleToken!.accessToken)
 
   const oauth2 = window.google?.accounts?.oauth2
   if (!oauth2) return Promise.reject(new Error('Google authorization is still loading. Wait a moment and try again.'))
@@ -84,17 +169,24 @@ export function requestGoogleAccess(userId: string, clientId: string) {
           reject(new Error(response.error_description || response.error || 'Google authorization was cancelled.'))
           return
         }
-        if (oauth2.hasGrantedAllScopes && !oauth2.hasGrantedAllScopes(response, ...GOOGLE_SCOPES)) {
+        const scopes = grantedScopes(response, oauth2)
+        if (!REQUIRED_GOOGLE_SCOPES.every((scope) => scopes.has(scope))) {
           reject(new Error('Calendar and Gmail permissions are both required for this connection.'))
           return
         }
+        // Cached even when an optional scope is missing: Calendar and sending
+        // still work, and the missing scope stops this token being reused for
+        // an action that needs it.
         googleToken = {
           userId,
           clientId: normalizedClientId,
           accessToken: response.access_token,
           expiresAt: Date.now() + Math.max(60, Number(response.expires_in) || 3600) * 1000,
+          scopes,
         }
-        resolve(response.access_token)
+        const missing = needs.filter((scope) => !scopes.has(scope))
+        if (missing.length) reject(new GoogleScopeError(missing))
+        else resolve(response.access_token)
       }),
       error_callback: (error) => finish(() => reject(new Error(error.message || 'The Google authorization window was closed.'))),
     })
@@ -257,4 +349,73 @@ export async function sendGmailMessage(accessToken: string, raw: string) {
   })
   if (!response.ok) throw await googleApiError(response, 'Gmail')
   return await response.json() as { id: string; threadId?: string }
+}
+
+export type GmailHeader = { name?: string; value?: string }
+
+export type GmailMessageMetadata = {
+  id: string
+  threadId?: string
+  internalDate?: string
+  labelIds?: string[]
+  payload?: { headers?: GmailHeader[] }
+}
+
+/**
+ * Headers read when classifying a message on a thread. The automation headers
+ * tell an out-of-office or a bounce apart from a person answering.
+ */
+export const THREAD_METADATA_HEADERS = [
+  'From',
+  'To',
+  'Subject',
+  'Date',
+  'Auto-Submitted',
+  'X-Autoreply',
+  'X-Autorespond',
+  'Precedence',
+  'X-Failed-Recipients',
+  'Content-Type',
+] as const
+
+function metadataUrl(path: string, headers: readonly string[]) {
+  const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`)
+  url.searchParams.set('format', 'metadata')
+  for (const header of headers) url.searchParams.append('metadataHeaders', header)
+  return url
+}
+
+/**
+ * Every message on one thread, headers and labels only. Returns null when the
+ * thread no longer exists in the mailbox.
+ */
+export async function fetchGmailThread(accessToken: string, threadId: string) {
+  const url = metadataUrl(`threads/${encodeURIComponent(threadId)}`, THREAD_METADATA_HEADERS)
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (response.status === 404) return null
+  if (!response.ok) throw await googleApiError(response, 'Gmail')
+  return await response.json() as { id: string; messages?: GmailMessageMetadata[] }
+}
+
+/**
+ * Recent messages in the Sent label, newest first, used to find a message
+ * whose send response was lost. The label filter is used rather than a search
+ * query because the metadata scope does not permit queries.
+ */
+export async function fetchRecentSentMessages(accessToken: string, maxResults = 25) {
+  const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
+  listUrl.searchParams.set('labelIds', 'SENT')
+  listUrl.searchParams.set('maxResults', String(maxResults))
+  const response = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!response.ok) throw await googleApiError(response, 'Gmail')
+  const listing = await response.json() as { messages?: Array<{ id: string }> }
+
+  return Promise.all((listing.messages ?? []).map(async ({ id }) => {
+    const messageResponse = await fetch(
+      metadataUrl(`messages/${encodeURIComponent(id)}`, ['To', 'Subject', 'Date']),
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+    if (!messageResponse.ok) throw await googleApiError(messageResponse, 'Gmail')
+    return await messageResponse.json() as GmailMessageMetadata
+  }))
 }

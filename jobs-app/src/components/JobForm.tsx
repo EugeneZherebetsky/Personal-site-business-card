@@ -1,22 +1,30 @@
 import { useState } from 'react'
-import { JOB_STATUSES, PRIORITIES, STATUS_LABELS, WORK_MODES, type ApplicationSend, type CV, type JobDraft, type JobPriority, type JobStatus, type WorkMode } from '../types'
+import { checkableSends } from '../lib/gmailReplies'
+import { JOB_STATUSES, PRIORITIES, STATUS_LABELS, WORK_MODES, type ApplicationSend, type CV, type EmailReply, type JobDraft, type JobPriority, type JobStatus, type WorkMode } from '../types'
+import { ReplyList } from './ReplyList'
 
 type JobFormProps = {
   initial: JobDraft
   title: string
   busy: boolean
   error: string
+  /** Outcome of a reply check, shown inside the dialog. */
+  notice: string
   cvs: CV[]
   existing: boolean
   googleConfigured: boolean
   sendHistoryPending: boolean
   sendHistory: ApplicationSend[]
+  /** Messages already detected on the Gmail threads this application was sent on. */
+  replies: EmailReply[]
   onCancel: () => void
   onSave: (draft: JobDraft) => Promise<void>
   onTailor: (draft: JobDraft) => Promise<void>
   onCalendar: (draft: JobDraft) => Promise<void>
   onSend: (draft: JobDraft) => Promise<void>
   onRetrySendHistory: () => Promise<void>
+  /** Asks Gmail whether any thread this application was sent on has been answered. */
+  onCheckReplies: () => Promise<void>
 }
 
 function withEmailDefaults(initial: JobDraft): JobDraft {
@@ -33,8 +41,9 @@ function sentAtLabel(value: string) {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
-export function JobForm({ initial, title, busy, error, cvs, existing, googleConfigured, sendHistoryPending, sendHistory, onCancel, onSave, onTailor, onCalendar, onSend, onRetrySendHistory }: JobFormProps) {
+export function JobForm({ initial, title, busy, error, notice, cvs, existing, googleConfigured, sendHistoryPending, sendHistory, replies, onCancel, onSave, onTailor, onCalendar, onSend, onRetrySendHistory, onCheckReplies }: JobFormProps) {
   const [draft, setDraft] = useState<JobDraft>(() => withEmailDefaults(initial))
+  const canCheckReplies = checkableSends(sendHistory).length > 0
 
   function field<K extends keyof JobDraft>(key: K, value: JobDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
@@ -94,7 +103,21 @@ export function JobForm({ initial, title, busy, error, cvs, existing, googleConf
 
           {sendHistory.length > 0 && <section className="send-history full"><strong>Send history</strong>{sendHistory.map((send) => <div key={send.id} className={send.status === 'sent' ? 'sent' : 'failed'}><span>{send.status === 'sent' ? 'Sent' : 'Failed'} {sentAtLabel(send.sent_at)}</span><small>{send.recipient} · {send.subject}</small></div>)}</section>}
 
+          {canCheckReplies && (
+            <section className="replies-panel full" aria-label="Replies to this application">
+              <div className="replies-panel-head">
+                <strong>Replies</strong>
+                <button className="button secondary" type="button" disabled={busy || !googleConfigured} onClick={() => void onCheckReplies()}>Check Gmail for replies</button>
+              </div>
+              {replies.length > 0
+                ? <ReplyList replies={replies} />
+                : <small>Nothing recorded yet. A check reads only the sender, subject and date of each message on the threads you sent, never its content.</small>}
+              <small>The stage is never changed for you. Move this application on yourself if the conversation has progressed.</small>
+            </section>
+          )}
+
           {error && <p className="form-message error-text full" role="alert">{error}</p>}
+          {notice && !error && <p className="form-message full" role="status">{notice}</p>}
           <div className="form-actions full">
             <button className="button secondary" type="button" onClick={onCancel}>Cancel</button>
             <button className="button primary" disabled={busy} type="submit">{busy ? 'Saving…' : 'Save application'}</button>

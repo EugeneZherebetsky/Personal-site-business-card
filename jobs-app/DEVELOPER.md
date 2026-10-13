@@ -353,6 +353,7 @@ Supabase considers an update that changes zero rows successful, so checking only
 | `20260804200000_harden_outreach_send.sql` | Adds the in-flight `sending` state and allows a deleted CV to null its outreach reference. |
 | `20260804201000_allow_outreach_attempt_reset.sql` | Lets the send attempt identifier be cleared when an unsent message returns to draft. |
 | `20260804210000_add_email_replies.sql` | Adds the detected-reply cache for applications and outreach, with per-message deduplication. |
+| `20260804211000_clean_email_replies_on_source_deletion.sql` | Purges cached email replies when their parent job or outreach email is deleted. |
 
 For a schema change:
 

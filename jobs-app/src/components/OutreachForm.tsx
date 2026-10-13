@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { formatDateTime } from '../lib/opportunities'
 import { followUpDateInput, hasUnfilledPlaceholder, suggestedOutreach } from '../lib/outreach'
 import {
@@ -53,6 +53,12 @@ export function OutreachForm({
   const [replyStatus, setReplyStatus] = useState<ReplyStatus>(sent?.reply_status ?? 'awaiting')
   const [validationError, setValidationError] = useState('')
   const readOnly = Boolean(sent) || Boolean(inFlight)
+
+  useEffect(() => {
+    if (sent?.reply_status) {
+      setReplyStatus(sent.reply_status)
+    }
+  }, [sent?.reply_status])
 
   function field<K extends keyof OutreachDraft>(key: K, value: OutreachDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))

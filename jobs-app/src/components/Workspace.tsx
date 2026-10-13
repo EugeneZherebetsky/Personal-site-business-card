@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import type { RealtimeChannel, Session } from '@supabase/supabase-js'
 import { cvToDraft, safeStorageFilename, validateCVFile } from '../lib/cvs'
-import { buildRawEmail, clearGoogleAccess, createCalendarEvent, fetchGmailThread, fetchRecentSentMessages, hasGoogleAccess, isGoogleRefusal, isTerminalClientError, requestGoogleAccess, sendGmailMessage, validGoogleClientId } from '../lib/google'
+import { buildRawEmail, clearGoogleAccess, createCalendarEvent, fetchGmailThread, fetchRecentSentMessages, forgetGoogleScope, GMAIL_METADATA_SCOPE, GoogleScopeError, hasGoogleAccess, isGoogleRefusal, isTerminalClientError, requestGoogleAccess, sendGmailMessage, validGoogleClientId } from '../lib/google'
 import { checkableSends, findThreadReplies, matchLostSend, summarizeReplies, type ThreadCheckSummary } from '../lib/gmailReplies'
 import {
   ACTIVE_STATUSES,
@@ -99,14 +99,15 @@ import { tailoredCVText, type TailoringResult } from '../lib/tailoring'
 type WorkspaceProps = { session: Session }
 
 /**
- * Reading reply headers needs the Gmail metadata scope, which connections made
- * before reply checking existed never granted, and which can be declined on
- * its own. A refusal therefore usually means that one permission is missing.
+ * Reading reply headers needs the Gmail metadata scope, which can be declined
+ * on its own. A missing grant is caught before the call (`GoogleScopeError`);
+ * a refusal from Gmail itself usually means the same thing.
  */
 function gmailReadError(caught: unknown) {
+  if (caught instanceof GoogleScopeError) return caught.message
   const message = caught instanceof Error ? caught.message : 'Gmail could not be reached.'
   if (isGoogleRefusal(caught) && (caught.status === 401 || caught.status === 403)) {
-    return `${message} Checking Gmail needs the permission that reads message headers only. Open Settings, select Connect Google, approve it, then try again.`
+    return `${message} Checking Gmail needs the permission that reads message headers only. Try again and allow it when Google asks.`
   }
   return message
 }
@@ -799,12 +800,16 @@ export function Workspace({ session }: WorkspaceProps) {
     setError('')
     setNotice('')
     setDialogNotice('')
-    const token = await requestGoogleAccess(session.user.id, googleClientId())
+    // A cached token without header access is not reused, so a check after
+    // declining that permission asks Google again rather than failing with 403.
+    const token = await requestGoogleAccess(session.user.id, googleClientId(), { needs: [GMAIL_METADATA_SCOPE] })
     setGoogleConnected(true)
     return token
   }
 
   async function failGmailRead(caught: unknown) {
+    // Gmail refusing a read means this token cannot do it; ask again next time.
+    if (isGoogleRefusal(caught) && caught.status === 403) forgetGoogleScope(GMAIL_METADATA_SCOPE)
     setGoogleConnected(hasGoogleAccess(session.user.id, settings?.google_client_id))
     setError(gmailReadError(caught))
     await loadWorkspace()
@@ -1097,13 +1102,21 @@ export function Workspace({ session }: WorkspaceProps) {
     setError('')
     setNotice('')
     try {
-      await requestGoogleAccess(session.user.id, clientId)
+      // Asking for header access too means reconnecting after declining it
+      // prompts again instead of returning the cached token.
+      await requestGoogleAccess(session.user.id, clientId, { needs: [GMAIL_METADATA_SCOPE] })
       setGoogleConnected(true)
       setNotice('Google is connected for this browser session. Save Settings to synchronize the public client ID.')
     }
     catch (caught) {
-      setGoogleConnected(false)
-      setError(caught instanceof Error ? caught.message : 'Google could not be connected.')
+      if (caught instanceof GoogleScopeError) {
+        setGoogleConnected(true)
+        setNotice('Google is connected for Calendar and sending. Reply checking was not allowed; select Connect Google again to allow it.')
+      }
+      else {
+        setGoogleConnected(false)
+        setError(caught instanceof Error ? caught.message : 'Google could not be connected.')
+      }
     }
     finally {
       setBusy(false)

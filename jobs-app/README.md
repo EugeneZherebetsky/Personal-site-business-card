@@ -136,7 +136,7 @@ Calendar and Gmail use Google Identity Services' browser token model. The site s
 6. Add three scopes to the consent screen: `calendar.events`, `gmail.send`, and `gmail.metadata`.
 7. Paste the client ID into Settings, save it, and select Connect Google.
 
-`gmail.send` and `gmail.metadata` are restricted scopes. While the app stays in testing with your own address as a test user, Google verification is not required. Only Calendar and sending are required; if you decline the header permission, reply checks explain how to grant it later by selecting **Connect Google** again.
+`gmail.send` and `gmail.metadata` are restricted scopes. While the app stays in testing with your own address as a test user, Google verification is not required. Only Calendar and sending are required. If you decline the header permission, Calendar and sending keep working, and the next reply check or **Connect Google** asks Google for it again.
 
 Google authorization expires periodically by design; Calendar and Gmail actions ask you to reconnect when a fresh token is required.
 

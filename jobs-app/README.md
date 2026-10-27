@@ -156,6 +156,7 @@ Reminder digests are sent by the `send-reminders` Edge Function, which pg_cron i
 1. Create a [Resend](https://resend.com) account and generate an API key.
 2. Under **Supabase Dashboard → Edge Functions → Secrets**, add `RESEND_API_KEY` and `REMINDER_CRON_SECRET` (a long random string). `REMINDER_FROM_EMAIL` is optional.
 3. Under **Supabase Dashboard → Database → Vault**, add a secret named `reminder_cron_secret` holding the same value as `REMINDER_CRON_SECRET`. The scheduled job reads it at execution time, so no secret is stored in a migration.
+   In the same place, add a secret named `project_url` holding your project URL (`https://<project-ref>.supabase.co`); the schedule uses it to reach the function.
 4. Deploy the function with `supabase functions deploy send-reminders`.
 5. In Settings, enable **Email me due follow-ups** and choose a delivery hour.
 

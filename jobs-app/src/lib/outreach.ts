@@ -98,7 +98,9 @@ export function dueOutreachFollowUps(emails: OutreachEmail[]) {
  * the specific reason for writing blank: a message without it reads as a
  * circular and is the main reason cold outreach is ignored.
  */
-export function suggestedOutreach(company: string, recipientName: string, senderName = 'Eugene Zherebetsky') {
+export function suggestedOutreach(company: string, recipientName: string, senderName?: string | null) {
+  // A bracketed placeholder blocks sending until the user signs the message.
+  const signature = senderName?.trim() || '[Your name]'
   const firstName = recipientName.trim().split(/\s+/)[0] ?? ''
   const greeting = firstName ? `Dear ${firstName},` : 'Dear Sir or Madam,'
   const target = company.trim() || '[company]'
@@ -114,7 +116,7 @@ export function suggestedOutreach(company: string, recipientName: string, sender
       'If it would be useful, I would welcome a short conversation, whether or not there is anything open at the moment. My CV is attached for context.',
       '',
       'Kind regards,',
-      senderName,
+      signature,
     ].join('\n'),
   }
 }

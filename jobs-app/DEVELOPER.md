@@ -429,6 +429,8 @@ Configure private values in Supabase Edge Functions, not in the repository:
 
 The reminder schedule also needs a Vault secret named `reminder_cron_secret` (Dashboard → Database → Vault) holding the same value as `REMINDER_CRON_SECRET`; pg_cron reads it at execution time so no secret is stored in the migration.
 
+It also reads the project URL from a Vault secret named `project_url` (`https://<project-ref>.supabase.co`), so the migration carries no project-specific address. The production job was scheduled before this change with the URL written in; it keeps working, and only a re-run of the schedule (for example on a new project) needs `project_url`.
+
 The `tailor-cv` function performs its own Supabase user verification. Its gateway JWT check is disabled so browser preflight requests work, but the function must continue rejecting missing or invalid bearer sessions itself.
 
 ### Google configuration

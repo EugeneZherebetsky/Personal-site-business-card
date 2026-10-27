@@ -52,6 +52,8 @@ grant all on table public.reminder_deliveries to service_role;
 -- per user whether the local delivery hour matches and what is newly due.
 -- The shared secret lives in Vault under the name 'reminder_cron_secret' and
 -- is read at execution time, so this migration stores no secret material.
+-- The project URL (https://<project-ref>.supabase.co) is read the same way
+-- from the Vault secret 'project_url', so the migration works in any project.
 create extension if not exists pg_cron;
 create extension if not exists pg_net with schema extensions;
 
@@ -60,7 +62,10 @@ select cron.schedule(
   '5 * * * *',
   $cron$
   select net.http_post(
-    url := 'https://tcbdvssujsjrexddcrgc.supabase.co/functions/v1/send-reminders',
+    url := coalesce(
+      (select decrypted_secret from vault.decrypted_secrets where name = 'project_url'),
+      ''
+    ) || '/functions/v1/send-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'x-reminder-secret', coalesce(

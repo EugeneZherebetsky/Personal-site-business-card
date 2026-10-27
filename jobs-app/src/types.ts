@@ -36,7 +36,7 @@ export type WorkMode = (typeof WORK_MODES)[number]
 export const PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const
 export type JobPriority = (typeof PRIORITIES)[number]
 
-export const APP_VIEWS = ['dashboard', 'board', 'applications', 'reminders', 'contacts', 'outreach', 'interviews', 'analytics', 'cvs', 'search', 'backup', 'settings'] as const
+export const APP_VIEWS = ['dashboard', 'board', 'applications', 'reminders', 'contacts', 'outreach', 'interviews', 'cvs', 'search', 'backup', 'settings'] as const
 export type AppView = (typeof APP_VIEWS)[number]
 export type DefaultView = Extract<AppView, 'dashboard' | 'board' | 'applications' | 'reminders' | 'cvs'>
 

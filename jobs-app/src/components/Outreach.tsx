@@ -9,6 +9,8 @@ type OutreachViewProps = {
   onCompose: () => void
   onOpen: (email: OutreachEmail) => void
   onDelete: (email: OutreachEmail) => Promise<void>
+  /** Returns to Network, where this page is linked from. */
+  onBack?: () => void
 }
 
 const FILTERS: Array<{ key: OutreachFilter; label: string }> = [
@@ -20,7 +22,7 @@ const FILTERS: Array<{ key: OutreachFilter; label: string }> = [
   { key: 'no_reply', label: 'No reply' },
 ]
 
-export function OutreachView({ emails, busy, onCompose, onOpen, onDelete }: OutreachViewProps) {
+export function OutreachView({ emails, busy, onCompose, onOpen, onDelete, onBack }: OutreachViewProps) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<OutreachFilter>('all')
   const summary = useMemo(() => outreachSummary(emails), [emails])
@@ -48,6 +50,7 @@ export function OutreachView({ emails, busy, onCompose, onOpen, onDelete }: Outr
         <div className="workspace-head">
           <div><p className="eyebrow">Speculative outreach</p><h2>{emails.length} message{emails.length === 1 ? '' : 's'}</h2></div>
           <div className="controls">
+            {onBack && <button className="button ghost" type="button" onClick={onBack}>← Network</button>}
             <button className="button primary" onClick={onCompose}>+ Write to a company</button>
             <input aria-label="Search outreach" placeholder="Search company, person, subject or message" value={search} onChange={(event) => setSearch(event.target.value)} />
           </div>

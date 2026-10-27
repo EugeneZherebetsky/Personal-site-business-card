@@ -19,14 +19,13 @@ Supabase remains the only source of truth. You sign in on a device; you never en
 
 | View | What it is for |
 |---|---|
-| Dashboard | Pipeline metrics and the next actions that need attention. |
-| Board | Kanban columns covering every status, with drag-and-drop CV assignment. |
+| Overview | Status at a glance (headline counts, next actions across applications and network, pipeline by stage), then weekly effort, the conversion funnel, and results by source and CV version further down. |
+| Board | Kanban columns covering every status. Drag a card to another stage to change its status, or drag a CV onto a card to link it. |
 | Applications | Searchable, filterable table of every opportunity with inline actions. |
 | Reminders | Application, networking, and outreach follow-ups due soon, newest first. |
-| Network | Contacts, their own outreach pipeline, and logged interactions. |
-| Outreach | Speculative emails to company leaders, kept exactly as sent. |
+| Network | Contacts, their own outreach pipeline, and logged interactions. Links to Outreach. |
+| Outreach | Speculative emails to company leaders, kept exactly as sent. Not in the menu; opened from Network. |
 | Interviews | Upcoming interviews, per-application preparation, and the STAR story library. |
-| Analytics | Weekly effort, conversion funnel, response times, and what is actually working. |
 | CV library | Private CV files and text versions, reusable content blocks, and the CV builder. |
 | Find jobs | Live Remotive and Arbeitnow vacancy search with one-click saving. |
 | Backup | JSON backup/restore and CSV export of applications. |
@@ -98,7 +97,7 @@ Every view is reachable on mobile through the horizontal navigation strip.
 - Likely topics derived locally from the job description, and your most relevant STAR stories ranked against it.
 - Per-application research notes, questions to ask, a preparation checklist, and post-interview notes.
 
-### Analytics
+### Overview analytics
 
 - Applications per week, response and interview rates, and a conversion funnel.
 - Median time from applying to a first response, measured only from history recorded live.

@@ -101,8 +101,8 @@ Professional PDF/DOCX CV output (previously Phase 10) is deferred: CVs and cover
 
 ### Opportunity tracking
 
-- Dashboard metrics and follow-up queue.
-- Board columns for every status, including `on_hold`.
+- Overview page (view id `dashboard`, kept because `user_settings.default_view` is constrained to it): headline counts, merged application and networking next actions, a pipeline strip by board column, then the former Analytics content below the fold.
+- Board columns for every status, including `on_hold`. Cards drag between stages; multi-status columns split into one drop zone per status while a card is dragged, and the current status refuses the drop. Job and CV drags use separate `dataTransfer` types so the gestures never cross.
 - Searchable and filterable application table.
 - Priority, work mode, salary, source, contacts, job description, notes, dates, and email draft.
 - Local-time conversion for `datetime-local` editing.
@@ -238,7 +238,7 @@ Professional PDF/DOCX CV output (previously Phase 10) is deferred: CVs and cover
 
 - `job_stage_events` records immutable application-stage history: a `created` event on insert and a `status_change` event on every status transition, written by a protected trigger.
 - Existing applications were backfilled with `backfill_current_state` events whose details mark them as excluded from duration metrics; reaching a state still counts for funnel purposes.
-- The Analytics view computes everything client-side: applications per week (by applied date), response/interview/offer rates, a stage funnel of states ever reached, median days from applying to first response (live-recorded events only), results by source and by CV version, and overdue follow-up counts.
+- The Overview page computes everything client-side: applications per week (by applied date), response/interview/offer rates, a stage funnel of states ever reached, median days from applying to first response (live-recorded events only), results by source and by CV version, and overdue follow-up counts.
 - Stage events are fetched in pages because the API caps every request at `max_rows`; a single capped query would silently truncate history. Weekly buckets are matched on calendar week keys, not elapsed milliseconds, so daylight-saving weeks do not shift counts.
 - Percentages are never shown without their underlying counts (`shareLabel`), and the view states explicitly that small samples are not predictions.
 
@@ -267,7 +267,8 @@ Professional PDF/DOCX CV output (previously Phase 10) is deferred: CVs and cover
 | `src/components/ContactForm.tsx` | Contact editor with interaction logging and history. |
 | `src/components/InterviewPrep.tsx` | Upcoming interviews, likely topics, story ranking, checklist, preparation notes, and the STAR library. |
 | `src/components/StarStoryForm.tsx` | STAR story editor. |
-| `src/components/Analytics.tsx` | Counts-first analytics view: weekly effort, funnel, response times, sources, and CV performance. |
+| `src/components/Overview.tsx` | Start page: status at a glance above the fold, then counts-first analytics (weekly effort, funnel, response times, sources, CV performance). Replaces the former Dashboard and Analytics views. |
+| `src/components/Board.tsx` | Kanban board: drag cards between stages to change status, drag CVs onto cards to link them. |
 | `src/components/StarStoryView.tsx` | Read-only STAR story view with missing-part warnings. |
 | `src/components/CVBuilder.tsx` | Role targeting, ranked blocks and stories, coverage, editable preview, and saving a built CV. |
 | `src/components/CVBlockForm.tsx` | Reusable CV block editor. |

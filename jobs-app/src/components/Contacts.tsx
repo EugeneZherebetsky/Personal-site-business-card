@@ -18,9 +18,11 @@ type ContactsViewProps = {
   onEdit: (contact: Contact) => void
   onDelete: (contact: Contact) => Promise<void>
   onStage: (contact: Contact, stage: ContactStage) => Promise<void>
+  /** Opens the speculative outreach log, which is kept out of the main menu. */
+  onOpenOutreach?: () => void
 }
 
-export function ContactsView({ contacts, jobs, busy, onAdd, onEdit, onDelete, onStage }: ContactsViewProps) {
+export function ContactsView({ contacts, jobs, busy, onAdd, onEdit, onDelete, onStage, onOpenOutreach }: ContactsViewProps) {
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<'all' | ContactStage>('all')
   const visibleContacts = useMemo(() => contacts.filter((contact) => contactMatches(contact, search, stageFilter)), [contacts, search, stageFilter])
@@ -36,6 +38,7 @@ export function ContactsView({ contacts, jobs, busy, onAdd, onEdit, onDelete, on
             <option value="all">All stages</option>
             {CONTACT_STAGES.map((stage) => <option key={stage} value={stage}>{CONTACT_STAGE_LABELS[stage]}</option>)}
           </select>
+          {onOpenOutreach && <button className="button secondary" type="button" onClick={onOpenOutreach}>Outreach emails</button>}
         </div>
       </div>
       {contacts.length > 0 && (

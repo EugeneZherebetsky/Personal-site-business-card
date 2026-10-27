@@ -14,7 +14,7 @@ import {
   toDraft,
 } from '../lib/opportunities'
 import { backupRows, parseBackup } from '../lib/backup'
-import { NAV_ITEMS, viewTitle } from '../lib/navigation'
+import { NAV_GROUPS, NAV_ITEMS, activeNavView, viewTitle } from '../lib/navigation'
 import { clearPending, pendingOutreachKey, pendingSendKey, readPendingOutreach, readPendingSend, storePending, type PendingOutreachRecord } from '../lib/pendingRecords'
 import { blockDraftToPayload, blockToDraft } from '../lib/cvBuilder'
 import { dueOutreachFollowUps, outreachDraftToPayload, outreachToDraft } from '../lib/outreach'
@@ -71,8 +71,8 @@ import {
   type StarStory,
   type StarStoryDraft,
   type UserSettings,
+  STATUS_LABELS,
 } from '../types'
-import { AnalyticsView } from './Analytics'
 import { ApplicationsView } from './Applications'
 import { BackupView } from './Backup'
 import { BoardView } from './Board'
@@ -82,11 +82,11 @@ import { CVBlockForm } from './CVBlockForm'
 import { CVBuilder, type BuiltCV } from './CVBuilder'
 import { CVForm } from './CVForm'
 import { CVLibrary } from './CVLibrary'
-import { DashboardView } from './Dashboard'
 import { InterviewPrepView } from './InterviewPrep'
 import { JobForm } from './JobForm'
 import { JobSearch } from './JobSearch'
 import { OutreachView } from './Outreach'
+import { OverviewView } from './Overview'
 import { OutreachForm, type OutreachOutcome } from './OutreachForm'
 import { RemindersView } from './Reminders'
 import { SettingsView } from './Settings'
@@ -347,8 +347,7 @@ export function Workspace({ session }: WorkspaceProps) {
     active: jobs.filter((job) => ACTIVE_STATUSES.includes(job.status)).length,
     interviews: jobs.filter((job) => ['phone_screen', 'interviewing', 'assessment', 'final_round'].includes(job.status)).length,
     offers: jobs.filter((job) => job.status === 'offer').length,
-    followUps: reminders.filter((job) => new Date(job.next_action_at!).getTime() <= Date.now() + 7 * 86_400_000).length,
-  }), [jobs, reminders])
+  }), [jobs])
 
   /**
    * Runs an optimistic-locked save and reports its outcome the same way for
@@ -502,9 +501,11 @@ export function Workspace({ session }: WorkspaceProps) {
     if (status === job.status) return
     setBusy(true)
     setError('')
+    setNotice('')
     const { data, error: updateError } = await updateJobLocked(job, { status })
     if (updateError) setError(updateError.message)
     else if (!data) setError('This application changed on another device. The latest version has been loaded; please try the move again.')
+    else setNotice(`${job.role_title} at ${job.company} moved to ${STATUS_LABELS[status]}.`)
     await loadWorkspace()
     setBusy(false)
   }
@@ -1555,10 +1556,15 @@ export function Workspace({ session }: WorkspaceProps) {
       <aside className="sidebar">
         <div className="sidebar-brand"><span className="brand-mark small">EZ</span><div><strong>Opportunity Desk</strong><span>Career workspace</span></div></div>
         <nav aria-label="Main navigation">
-          {NAV_ITEMS.map((item) => (
-            <button key={item.view} className={view === item.view ? 'nav-item active' : 'nav-item'} onClick={() => setView(item.view)}>
-              <span aria-hidden="true">{item.symbol}</span>{item.label}
-            </button>
+          {NAV_GROUPS.map((group) => (
+            <div className="nav-group" key={group}>
+              <p className="nav-group-label">{group}</p>
+              {NAV_ITEMS.filter((item) => item.group === group).map((item) => (
+                <button key={item.view} className={activeNavView(view) === item.view ? 'nav-item active' : 'nav-item'} aria-current={view === item.view ? 'page' : undefined} onClick={() => setView(item.view)}>
+                  <span aria-hidden="true">{item.symbol}</span>{item.label}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="sidebar-account"><span>{session.user.email}</span><span>{googleConnected ? 'Google connected' : settings?.google_client_id ? 'Google ready' : 'Google not configured'}</span><button className="button ghost" onClick={() => void signOut()}>Sign out</button></div>
@@ -1566,7 +1572,7 @@ export function Workspace({ session }: WorkspaceProps) {
 
       <div className="workspace-shell">
         <header className="mobile-topbar"><strong>Opportunity Desk</strong><button className="button ghost" onClick={() => void signOut()}>Sign out</button></header>
-        <div className="mobile-nav" aria-label="Mobile navigation">{NAV_ITEMS.map((item) => <button key={item.view} className={view === item.view ? 'active' : ''} onClick={() => setView(item.view)}>{item.label}</button>)}</div>
+        <div className="mobile-nav" aria-label="Mobile navigation">{NAV_ITEMS.map((item) => <button key={item.view} className={activeNavView(view) === item.view ? 'active' : ''} aria-current={view === item.view ? 'page' : undefined} onClick={() => setView(item.view)}>{item.label}</button>)}</div>
         <main className="dashboard">
           <section className="page-head">
             <div><p className="eyebrow">Private synchronized workspace</p><h1>{viewTitle(view)}</h1></div>
@@ -1578,14 +1584,13 @@ export function Workspace({ session }: WorkspaceProps) {
           {notice && <div className="notice-banner" role="status">{notice}</div>}
           {loading ? <div className="workspace-card empty-state">Loading your workspace…</div> : (
             <>
-              {view === 'dashboard' && <DashboardView jobs={jobs} counts={counts} reminders={reminders} onEdit={openEditor} onViewAll={() => setView('applications')} />}
+              {view === 'dashboard' && <OverviewView jobs={jobs} cvs={cvs} stageEvents={stageEvents} counts={counts} jobReminders={reminders} contactReminders={contactReminders} onEditJob={openEditor} onEditContact={(contact) => { setError(''); setEditingContact(contact) }} onOpenBoard={() => setView('board')} onOpenReminders={() => setView('reminders')} />}
               {view === 'board' && <BoardView jobs={jobs} cvs={cvs} busy={busy} onEdit={openEditor} onStatus={changeStatus} onCV={changeJobCV} />}
               {view === 'applications' && <ApplicationsView jobs={visibleJobs} cvs={cvs} sends={applicationSends} total={jobs.length} search={search} filter={filter} busy={busy} onSearch={setSearch} onFilter={setFilter} onEdit={openEditor} onTailor={(job) => { setError(''); setNotice(''); setTailoringJob(job) }} onDelete={deleteJob} onDownloadCV={downloadCV} />}
               {view === 'reminders' && <RemindersView jobs={reminders} contacts={contactReminders} outreach={outreachReminders} onEdit={openEditor} onEditContact={(contact) => { setError(''); setEditingContact(contact) }} onOpenOutreach={(email) => { setError(''); setEditingOutreach(email) }} onEnable={enableNotifications} />}
-              {view === 'outreach' && <OutreachView emails={outreachEmails} busy={busy} onCompose={() => { setError(''); setNotice(''); setEditingOutreach('new') }} onOpen={(email) => { setError(''); setNotice(''); setEditingOutreach(email) }} onDelete={deleteOutreach} />}
-              {view === 'contacts' && <ContactsView contacts={contacts} jobs={jobs} busy={busy} onAdd={() => { setError(''); setEditingContact('new') }} onEdit={(contact) => { setError(''); setEditingContact(contact) }} onDelete={deleteContact} onStage={changeContactStage} />}
+              {view === 'outreach' && <OutreachView onBack={() => setView('contacts')} emails={outreachEmails} busy={busy} onCompose={() => { setError(''); setNotice(''); setEditingOutreach('new') }} onOpen={(email) => { setError(''); setNotice(''); setEditingOutreach(email) }} onDelete={deleteOutreach} />}
+              {view === 'contacts' && <ContactsView onOpenOutreach={() => setView('outreach')} contacts={contacts} jobs={jobs} busy={busy} onAdd={() => { setError(''); setEditingContact('new') }} onEdit={(contact) => { setError(''); setEditingContact(contact) }} onDelete={deleteContact} onStage={changeContactStage} />}
               {view === 'interviews' && <InterviewPrepView jobs={jobs} preps={interviewPreps} stories={starStories} busy={busy} onSavePrep={saveInterviewPrep} onAddStory={() => { setError(''); setEditingStar('new') }} onViewStory={(story) => { setError(''); setViewingStar(story) }} onEditStory={(story) => { setError(''); setEditingStar(story) }} onDeleteStory={deleteStarStory} />}
-              {view === 'analytics' && <AnalyticsView jobs={jobs} contacts={contacts} cvs={cvs} stageEvents={stageEvents} />}
               {view === 'backup' && <BackupView jobs={jobs} busy={busy} onJson={exportJson} onCsv={exportCsv} onImport={importJson} />}
               {view === 'settings' && settings && <SettingsView settings={settings} busy={busy} googleConnected={googleConnected} onSave={saveSettings} onConnectGoogle={connectGoogle} onEnableNotifications={enableNotifications} />}
               {view === 'cvs' && <CVLibrary cvs={cvs} blocks={cvBlocks} busy={busy} onAdd={() => { setError(''); setEditingCV('new') }} onEdit={(cv) => { setError(''); setEditingCV(cv) }} onDownload={downloadCV} onDelete={deleteCV} onBuild={() => { setError(''); setNotice(''); setBuildingCV(true) }} onAddBlock={() => { setError(''); setEditingBlock('new') }} onEditBlock={(block) => { setError(''); setEditingBlock(block) }} onDeleteBlock={deleteCVBlock} />}

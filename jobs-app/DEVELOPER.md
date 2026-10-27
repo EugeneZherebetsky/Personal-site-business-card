@@ -105,6 +105,7 @@ Professional PDF/DOCX CV output (previously Phase 10) is deferred: CVs and cover
 - Board columns for every status, including `on_hold`. Cards drag between stages; multi-status columns split into one drop zone per status while a card is dragged, and the current status refuses the drop. Job and CV drags use separate `dataTransfer` types so the gestures never cross.
 - Searchable and filterable application table.
 - Priority, work mode, salary, source, contacts, job description, notes, dates, and email draft.
+- Consistent naming (`src/lib/naming.ts`): company fields suggest existing employers and warn when the same employer is already tracked under another spelling; the source field suggests standard channels, and saving tidies whole-value variants (`linkedin` → LinkedIn, `referal` → Referral) without discarding detail such as `referral (Daniil)`. Results by source group detailed entries under their channel. Stored company names are never rewritten automatically.
 - Local-time conversion for `datetime-local` editing.
 - Optimistic locking through the `version` column.
 - JSON backup/restore and CSV export.

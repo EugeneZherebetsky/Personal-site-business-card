@@ -22,6 +22,8 @@ type ContactFormProps = {
   busy: boolean
   error: string
   jobs: Job[]
+  /** Company names already used in the workspace, offered as suggestions. */
+  companySuggestions?: string[]
   existing: boolean
   interactions: ContactInteraction[]
   onCancel: () => void
@@ -35,7 +37,7 @@ function interactionLabel(value: string) {
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
-export function ContactForm({ initial, title, busy, error, jobs, existing, interactions, onCancel, onSave, onLogInteraction, onDeleteInteraction }: ContactFormProps) {
+export function ContactForm({ initial, title, busy, error, jobs, companySuggestions = [], existing, interactions, onCancel, onSave, onLogInteraction, onDeleteInteraction }: ContactFormProps) {
   const [draft, setDraft] = useState<ContactDraft>(initial)
   const [interactionDraft, setInteractionDraft] = useState<InteractionDraft>({ occurred_at: toLocalDateTimeInput(new Date().toISOString()), channel: 'email', summary: '' })
   const [interactionError, setInteractionError] = useState('')
@@ -65,7 +67,8 @@ export function ContactForm({ initial, title, busy, error, jobs, existing, inter
           <h3 className="form-section-title full">Person</h3>
           <label>Name<input required autoFocus value={draft.name} onChange={(event) => field('name', event.target.value)} /></label>
           <label>Relationship<select value={draft.relationship} onChange={(event) => field('relationship', event.target.value as ContactRelationship)}>{CONTACT_RELATIONSHIPS.map((relationship) => <option key={relationship} value={relationship}>{RELATIONSHIP_LABELS[relationship]}</option>)}</select></label>
-          <label>Company<input value={draft.company} onChange={(event) => field('company', event.target.value)} /></label>
+          <label>Company<input value={draft.company} list="contact-company-suggestions" autoComplete="off" onChange={(event) => field('company', event.target.value)} /></label>
+          <datalist id="contact-company-suggestions">{companySuggestions.map((name) => <option key={name} value={name} />)}</datalist>
           <label>Role<input value={draft.role_title} onChange={(event) => field('role_title', event.target.value)} placeholder="Talent partner, engineering manager…" /></label>
           <label>Email<input type="email" value={draft.email} onChange={(event) => field('email', event.target.value)} /></label>
           <label>Phone<input value={draft.phone} onChange={(event) => field('phone', event.target.value)} /></label>

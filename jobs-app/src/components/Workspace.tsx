@@ -15,6 +15,7 @@ import {
 } from '../lib/opportunities'
 import { backupRows, parseBackup } from '../lib/backup'
 import { NAV_GROUPS, NAV_ITEMS, activeNavView, viewTitle } from '../lib/navigation'
+import { companySuggestions, sourceSuggestions } from '../lib/naming'
 import { clearPending, pendingOutreachKey, pendingSendKey, readPendingOutreach, readPendingSend, storePending, type PendingOutreachRecord } from '../lib/pendingRecords'
 import { blockDraftToPayload, blockToDraft } from '../lib/cvBuilder'
 import { dueOutreachFollowUps, outreachDraftToPayload, outreachToDraft } from '../lib/outreach'
@@ -342,6 +343,9 @@ export function Workspace({ session }: WorkspaceProps) {
   const contactReminders = useMemo(() => contacts
     .filter((contact) => contact.next_action_at && contact.pipeline_stage !== 'closed')
     .sort((left, right) => new Date(left.next_action_at!).getTime() - new Date(right.next_action_at!).getTime()), [contacts])
+
+  const knownCompanies = useMemo(() => companySuggestions([...jobs.map((job) => job.company), ...cvs.map((cv) => cv.tailored_company), ...contacts.map((contact) => contact.company)]), [contacts, cvs, jobs])
+  const knownSources = useMemo(() => sourceSuggestions(jobs.map((job) => job.source)), [jobs])
 
   const counts = useMemo(() => ({
     active: jobs.filter((job) => ACTIVE_STATUSES.includes(job.status)).length,
@@ -1600,8 +1604,8 @@ export function Workspace({ session }: WorkspaceProps) {
         </main>
       </div>
 
-      {editing && <JobForm initial={editing === 'new' ? EMPTY_JOB : toDraft(editing)} title={editing === 'new' ? 'Add an opportunity' : 'Update application'} busy={busy} error={error} notice={dialogNotice} cvs={cvs} existing={editing !== 'new'} googleConfigured={Boolean(settings?.google_client_id)} sendHistoryPending={Boolean(pendingSendHistory)} sendHistory={editing === 'new' ? [] : applicationSends.filter((send) => send.job_id === editing.id)} onCancel={() => { setError(''); setEditing(null) }} onSave={saveJob} onTailor={saveAndOpenTailoring} onCalendar={addToGoogleCalendar} onSend={sendApplicationEmail} onRetrySendHistory={retrySendHistory} replies={editing === 'new' ? [] : emailReplies.filter((reply) => reply.source_type === 'job' && reply.source_id === editing.id)} onCheckReplies={() => checkJobReplies(editing as Job)} />}
-      {editingContact && <ContactForm initial={editingContact === 'new' ? EMPTY_CONTACT : contactToDraft(editingContact)} title={editingContact === 'new' ? 'Add a contact' : 'Update contact'} busy={busy} error={error} jobs={jobs} existing={editingContact !== 'new'} interactions={editingContact === 'new' ? [] : contactHistory} onCancel={() => { setError(''); setEditingContact(null) }} onSave={saveContact} onLogInteraction={logInteraction} onDeleteInteraction={deleteInteraction} />}
+      {editing && <JobForm companySuggestions={knownCompanies} sourceSuggestions={knownSources} otherJobs={editing === 'new' ? jobs : jobs.filter((job) => job.id !== editing.id)} initial={editing === 'new' ? EMPTY_JOB : toDraft(editing)} title={editing === 'new' ? 'Add an opportunity' : 'Update application'} busy={busy} error={error} notice={dialogNotice} cvs={cvs} existing={editing !== 'new'} googleConfigured={Boolean(settings?.google_client_id)} sendHistoryPending={Boolean(pendingSendHistory)} sendHistory={editing === 'new' ? [] : applicationSends.filter((send) => send.job_id === editing.id)} onCancel={() => { setError(''); setEditing(null) }} onSave={saveJob} onTailor={saveAndOpenTailoring} onCalendar={addToGoogleCalendar} onSend={sendApplicationEmail} onRetrySendHistory={retrySendHistory} replies={editing === 'new' ? [] : emailReplies.filter((reply) => reply.source_type === 'job' && reply.source_id === editing.id)} onCheckReplies={() => checkJobReplies(editing as Job)} />}
+      {editingContact && <ContactForm companySuggestions={knownCompanies} initial={editingContact === 'new' ? EMPTY_CONTACT : contactToDraft(editingContact)} title={editingContact === 'new' ? 'Add a contact' : 'Update contact'} busy={busy} error={error} jobs={jobs} existing={editingContact !== 'new'} interactions={editingContact === 'new' ? [] : contactHistory} onCancel={() => { setError(''); setEditingContact(null) }} onSave={saveContact} onLogInteraction={logInteraction} onDeleteInteraction={deleteInteraction} />}
       {editingStar && <StarStoryForm initial={editingStar === 'new' ? EMPTY_STAR_STORY : starStoryToDraft(editingStar)} title={editingStar === 'new' ? 'Add a STAR story' : 'Update STAR story'} busy={busy} error={error} onCancel={() => { setError(''); setEditingStar(null) }} onSave={saveStarStory} />}
       {viewingStar && !editingStar && <StarStoryView story={starStories.find((story) => story.id === viewingStar.id) ?? viewingStar} onClose={() => setViewingStar(null)} onEdit={(story) => { setViewingStar(null); setError(''); setEditingStar(story) }} />}
       {editingOutreach && <OutreachForm
@@ -1628,7 +1632,7 @@ export function Workspace({ session }: WorkspaceProps) {
       />}
       {editingBlock && <CVBlockForm initial={editingBlock === 'new' ? EMPTY_CV_BLOCK : blockToDraft(editingBlock)} title={editingBlock === 'new' ? 'Add a CV block' : 'Update CV block'} busy={busy} error={error} onCancel={() => { setError(''); setEditingBlock(null) }} onSave={saveCVBlock} />}
       {buildingCV && <CVBuilder jobs={jobs} blocks={cvBlocks} stories={starStories} busy={busy} error={error} notice={notice} onClose={() => { setError(''); setBuildingCV(false) }} onSave={saveBuiltCV} />}
-      {editingCV && <CVForm initial={editingCV === 'new' ? EMPTY_CV : cvToDraft(editingCV)} title={editingCV === 'new' ? 'Add a CV' : 'Update CV'} existingFilename={editingCV === 'new' ? null : editingCV.original_filename || (editingCV.storage_path ? 'Stored file' : null)} busy={busy} error={error} onCancel={() => { setError(''); setEditingCV(null) }} onSave={saveCV} />}
+      {editingCV && <CVForm companySuggestions={knownCompanies} initial={editingCV === 'new' ? EMPTY_CV : cvToDraft(editingCV)} title={editingCV === 'new' ? 'Add a CV' : 'Update CV'} existingFilename={editingCV === 'new' ? null : editingCV.original_filename || (editingCV.storage_path ? 'Stored file' : null)} busy={busy} error={error} onCancel={() => { setError(''); setEditingCV(null) }} onSave={saveCV} />}
       {tailoringJob && <TailorCV job={tailoringJob} cvs={cvs} busy={busy} actionError={error} actionNotice={notice} onClose={() => { setError(''); setTailoringJob(null) }} onSaveCV={saveTailoredCV} onUseCoverLetter={useTailoredCoverLetter} />}
     </div>
   )

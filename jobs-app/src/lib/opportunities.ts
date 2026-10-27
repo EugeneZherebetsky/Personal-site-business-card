@@ -8,6 +8,7 @@ import {
   type JobStatus,
   type WorkMode,
 } from '../types'
+import { canonicalSource } from './naming'
 
 export const ACTIVE_STATUSES: JobStatus[] = [
   'saved',
@@ -78,7 +79,7 @@ export function draftToPayload(draft: JobDraft) {
     priority: draft.priority,
     location: clean(draft.location),
     job_url: clean(draft.job_url),
-    source: clean(draft.source),
+    source: clean(canonicalSource(draft.source)),
     salary_text: clean(draft.salary_text),
     contact_name: clean(draft.contact_name),
     contact_email: clean(draft.contact_email),

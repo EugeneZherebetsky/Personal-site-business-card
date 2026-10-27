@@ -1,5 +1,6 @@
 import type { Contact, CV, Job, JobStageEvent, JobStatus } from '../types'
 import { ACTIVE_STATUSES } from './opportunities'
+import { sourceGroup } from './naming'
 
 export const RESPONSE_STATUSES: JobStatus[] = ['phone_screen', 'interviewing', 'assessment', 'final_round', 'offer', 'accepted', 'rejected']
 export const INTERVIEW_STATUSES: JobStatus[] = ['phone_screen', 'interviewing', 'assessment', 'final_round']
@@ -126,7 +127,7 @@ export function medianDaysToFirstResponse(events: JobStageEvent[]) {
 export type GroupOutcome = { label: string; total: number; applied: number; interviews: number; offers: number }
 
 export function resultsBySource(jobs: Job[], reached: Map<string, Set<JobStatus>>): GroupOutcome[] {
-  return groupOutcomes(jobs, reached, (job) => job.source?.trim() || 'No source recorded')
+  return groupOutcomes(jobs, reached, (job) => sourceGroup(job.source) || 'No source recorded')
 }
 
 export function resultsByCV(jobs: Job[], cvs: CV[], reached: Map<string, Set<JobStatus>>): GroupOutcome[] {

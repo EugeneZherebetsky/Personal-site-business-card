@@ -210,6 +210,8 @@ td > span, td small { margin-top: 4px; color: var(--muted); }
 .cv-preview { display: -webkit-box; overflow: hidden; padding: 11px; border-radius: 9px; background: #f6f8fb; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
 .cv-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: auto; padding-top: 3px; }
 .job-form label small { color: var(--muted); font-size: 11px; font-weight: 500; line-height: 1.45; }
+.job-form label small.company-hint { color: var(--amber); }
+.link-button { padding: 0; border: 0; background: none; color: var(--blue); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .google-actions, .ai-actions { display: grid; gap: 10px; padding: 15px; border: 1px solid #c7d8f7; border-radius: 12px; background: #f5f8ff; }
 .ai-actions { grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-color: #cdbcf5; background: #faf8ff; }
 .google-actions > div:first-child, .ai-actions > div:first-child { display: grid; gap: 4px; }

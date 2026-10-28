@@ -8,7 +8,6 @@ to reproduce. You can expect an acknowledgement within 5 working days.
 
 ## Scope
 
-- The static personal site at `ezherebetskii.com`
 - Opportunity Desk at `jobs.ezherebetskii.com` (`jobs-app/`)
 - Supabase database policies and Edge Functions (`supabase/`)
 

@@ -1,19 +1,15 @@
-# ezherebetskii-site
+# Opportunity Desk
 
-Personal site of Evgenii Zherebetskii plus **Opportunity Desk**, a private job-search workspace.
+A private, synchronized job-search workspace: track applications through a pipeline board, keep tailored CVs, work your network, prepare for interviews, get follow-up reminders, and see which channels and CV versions actually produce interviews.
+
+Each person signs in to their own Supabase-backed workspace; row-level security keeps every record private to its owner. The reference deployment runs at `jobs.ezherebetskii.com`.
 
 | Path | What it is |
 |---|---|
-| `index.html`, `styles.css`, `assets/` | Static personal site served at `ezherebetskii.com` |
-| `jobs-app/` | React + Vite application served at `jobs.ezherebetskii.com` |
-| `supabase/` | Database migrations and Edge Functions backing the jobs app |
+| `jobs-app/` | React + Vite browser application |
+| `supabase/` | Database migrations and Edge Functions |
 
-## Personal site
-
-Static HTML and CSS with no build step. Open `index.html` locally, or deploy the
-repository root as-is.
-
-## Opportunity Desk (`jobs-app/`)
+## Run it locally
 
 ```bash
 cd jobs-app
@@ -25,8 +21,8 @@ npm run build                # type-check and production build
 npm run format               # Prettier
 ```
 
-Architecture, delivery history and the roadmap live in
-[`jobs-app/DEVELOPER.md`](jobs-app/DEVELOPER.md).
+Features, architecture, delivery history and the roadmap live in
+[`jobs-app/README.md`](jobs-app/README.md) and [`jobs-app/DEVELOPER.md`](jobs-app/DEVELOPER.md).
 
 ## Supabase
 
@@ -40,7 +36,14 @@ supabase functions deploy send-reminders
 ```
 
 Secrets used by the functions: `OPENAI_API_KEY`, `SUPABASE_SECRET_KEY`, and
-optionally `OPENAI_MODEL`, `AI_DAILY_LIMIT`, `ALLOWED_ORIGINS`.
+optionally `OPENAI_MODEL`, `AI_DAILY_LIMIT`, `ALLOWED_ORIGINS`. Scheduled
+reminders also need the Vault secrets described in
+[`jobs-app/README.md`](jobs-app/README.md).
+
+## Deploying
+
+Build `jobs-app` with `npm run build` and serve `jobs-app/dist` from any static
+host. The reference deployment uses Cloudflare Pages.
 
 ## Contributing
 

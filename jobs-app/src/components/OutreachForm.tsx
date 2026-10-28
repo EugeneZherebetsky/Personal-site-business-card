@@ -32,6 +32,8 @@ type OutreachFormProps = {
   notice: string
   cvs: CV[]
   contacts: Contact[]
+  /** Name used to sign suggested messages; a placeholder is used when unknown. */
+  senderName?: string | null
   googleConfigured: boolean
   syncPending: boolean
   /** Messages already detected on this message's Gmail thread. */
@@ -50,7 +52,7 @@ type OutreachFormProps = {
 }
 
 export function OutreachForm({
-  initial, sent, inFlight, title, busy, error, notice, cvs, contacts, googleConfigured, syncPending, replies,
+  initial, sent, inFlight, title, busy, error, notice, cvs, contacts, senderName, googleConfigured, syncPending, replies,
   onCancel, onSaveDraft, onSend, onUpdateOutcome, onRetrySync, onResolveAttempt, onReconcileAttempt, onCheckReply,
 }: OutreachFormProps) {
   const [draft, setDraft] = useState<OutreachDraft>(initial)
@@ -71,7 +73,7 @@ export function OutreachForm({
   }
 
   function prefill() {
-    const suggestion = suggestedOutreach(draft.company, draft.recipient_name)
+    const suggestion = suggestedOutreach(draft.company, draft.recipient_name, senderName)
     setDraft((current) => ({
       ...current,
       subject: current.subject.trim() || suggestion.subject,

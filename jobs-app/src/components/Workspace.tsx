@@ -1605,6 +1605,7 @@ export function Workspace({ session }: WorkspaceProps) {
       {editingStar && <StarStoryForm initial={editingStar === 'new' ? EMPTY_STAR_STORY : starStoryToDraft(editingStar)} title={editingStar === 'new' ? 'Add a STAR story' : 'Update STAR story'} busy={busy} error={error} onCancel={() => { setError(''); setEditingStar(null) }} onSave={saveStarStory} />}
       {viewingStar && !editingStar && <StarStoryView story={starStories.find((story) => story.id === viewingStar.id) ?? viewingStar} onClose={() => setViewingStar(null)} onEdit={(story) => { setViewingStar(null); setError(''); setEditingStar(story) }} />}
       {editingOutreach && <OutreachForm
+        senderName={(session.user.user_metadata?.full_name ?? session.user.user_metadata?.name) as string | undefined}
         initial={editingOutreach === 'new' ? EMPTY_OUTREACH : outreachToDraft(editingOutreach)}
         sent={editingOutreach !== 'new' && editingOutreach.status === 'sent' ? editingOutreach : null}
         inFlight={editingOutreach !== 'new' && editingOutreach.status === 'sending' ? editingOutreach : null}
